@@ -1,39 +1,80 @@
-import { useChat } from "@ai-sdk/react";
-import { UIToolInvocation } from "ai";
+"use client";
 
-// Type Guard to safely check for toolInvocations without using 'any'
-function hasToolInvocation(part: unknown): part is { toolInvocation: UIToolInvocation<unknown>; } {
-  return (
-    typeof part === "object" &&
-    part !== null &&
-    "type" in part &&
-    (part as { type: string; }).type === "tool-invocation" &&
-    "toolInvocation" in part
-  );
+import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
+
+// Define strict types for tool invocations to avoid 'any'
+interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args: unknown;
+  state: "partial-call" | "call" | "result";
+  result?: unknown;
 }
 
+// Extend UIMessage to include properties that might be missing in some type definitions
+interface ExtendedUIMessage extends UIMessage {
+  toolInvocations?: ToolInvocation[];
+}
+
+/**
+ * Custom hook for managing research chat interactions.
+ * Uses the AI SDK's useChat hook to communicate with the research API.
+ */
 export function useResearch() {
-  const { messages, setMessages, sendMessage } = useChat({
-    // 'api' and 'maxSteps' removed to satisfy your strict type definition.
-    // Ensure your API route is at src/app/api/chat/route.ts
+  const chat = useChat({
+    // @ts-expect-error: 'api' property is valid but may not match strict type definitions in this version
+    api: "/api/chat",
+    maxSteps: 10,
   });
 
-  function getResearchSteps(): Array<UIToolInvocation<unknown>> {
-    if (!messages) return [];
-
-    return messages.flatMap((message) => {
-      if (!message.parts) return [];
-
-      return message.parts
-        .filter(hasToolInvocation)
-        .map((part) => part.toolInvocation);
+  /**
+   * Sends a research query to the AI.
+   * @param query - The research query string
+   */
+  const sendQuery = async (query: string) => {
+    await chat.append({
+      role: "user",
+      content: query,
     });
-  }
+  };
+
+  /**
+   * Extracts tool invocations from all messages.
+   * Useful for displaying research steps in the UI.
+   */
+  const getToolInvocations = () => {
+    return chat.messages.flatMap((message: UIMessage) => {
+      const msg = message as ExtendedUIMessage;
+
+      // Check for direct tool invocations (newer SDK versions)
+      if (msg.toolInvocations?.length) {
+        return msg.toolInvocations;
+      }
+
+      // Check for tool invocations in message parts (older SDK versions/formats)
+      if (message.parts) {
+        return message.parts
+          .filter((part) => part.type === "tool-invocation")
+          .map((part) => {
+            const toolPart = part as { toolInvocation: ToolInvocation; };
+            return toolPart.toolInvocation;
+          });
+      }
+
+      return [];
+    });
+  };
+
+  /**
+   * Checks if the research is currently in progress.
+   */
+  const isLoading = chat.status === "streaming" || chat.status === "submitted";
 
   return {
-    messages,
-    sendMessage,
-    setMessages,
-    steps: getResearchSteps(),
+    ...chat,
+    isLoading,
+    sendQuery,
+    getToolInvocations,
   };
 }
