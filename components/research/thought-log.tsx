@@ -1,8 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, Search, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// Define the shape of our log data to satisfy TypeScript
 interface LogStep {
   toolCallId: string;
   toolName: string;
@@ -14,30 +13,58 @@ interface LogStep {
 export function ThoughtLog({ steps }: { steps: LogStep[]; }) {
   return (
     <ScrollArea className="h-full pr-4">
-      <div className="flex flex-col gap-4">
-        {steps.map((step) => (
-          <div key={step.toolCallId} className="flex flex-col gap-2 p-3 border rounded-lg bg-card shadow-sm text-sm">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {step.toolName === 'webSearch' ? <Search className="w-4 h-4 text-blue-500" /> : <BookOpen className="w-4 h-4 text-green-500" />}
-                <span className="font-semibold capitalize">{step.toolName}</span>
-              </div>
-              <div>
-                {step.state === 'result' ? (
-                  <Badge variant="secondary" className="text-green-700 bg-green-50"><CheckCircle2 className="w-3 h-3 mr-1" /> Done</Badge>
-                ) : (
-                  <Badge variant="outline"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Working</Badge>
-                )}
-              </div>
-            </div>
+      <div className="flex flex-col gap-3">
+        {steps.map((step, i) => {
+          const isDone = step.state === 'result';
 
-            {/* Input Visualization */}
-            <div className="bg-slate-50 p-2 rounded border font-mono text-xs text-slate-600">
-              {JSON.stringify(step.args)}
+          return (
+            <div
+              key={step.toolCallId}
+              className={cn(
+                "group flex flex-col gap-2 p-3 rounded-lg border border-transparent transition-all",
+                // Hover effect: slight glow and border reveal
+                "hover:bg-white/5 hover:border-white/10",
+                // Active state: subtle pulse background
+                !isDone && "bg-white/5 border-white/5"
+              )}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "flex items-center justify-center w-6 h-6 rounded-full bg-secondary/50",
+                    step.toolName === 'webSearch' ? "text-blue-400" : "text-emerald-400"
+                  )}>
+                    {step.toolName === 'webSearch' ? <Search size={12} /> : <BookOpen size={12} />}
+                  </div>
+                  <span className="font-medium text-sm text-foreground/90 capitalize tracking-tight">
+                    {step.toolName}
+                  </span>
+                </div>
+                <div>
+                  {isDone ? (
+                    <CheckCircle2 className="w-4 h-4 text-muted-foreground/50" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  )}
+                </div>
+              </div>
+
+              {/* Input (Terminal Style) */}
+              <div className="pl-9">
+                <div className="font-mono text-[10px] text-muted-foreground/70 truncate group-hover:whitespace-normal group-hover:overflow-visible transition-all">
+                  <span className="text-primary/40 mr-2">$</span>
+                  {JSON.stringify(step.args)}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+
+        {/* Empty State / Vertical Line Connector Placeholder */}
+        {steps.length > 0 && (
+          <div className="absolute left-[27px] top-4 bottom-4 w-px bg-border -z-10" />
+        )}
       </div>
     </ScrollArea>
   );
