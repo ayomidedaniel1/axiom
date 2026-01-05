@@ -8,17 +8,18 @@ import ReactMarkdown from "react-markdown";
 interface MessageBubbleProps {
   message: UIMessage;
   getTextFromMessage: (message: UIMessage) => string;
+  createdAt?: Date | string;
 }
 
-export function MessageBubble({ message, getTextFromMessage }: MessageBubbleProps) {
+export function MessageBubble({ message, getTextFromMessage, createdAt }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const content = getTextFromMessage(message);
 
   if (!content) return null;
 
   const isUser = message.role === "user";
-  const timestamp = message.createdAt
-    ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const timestamp = createdAt
+    ? new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
 
   const handleCopy = async () => {
