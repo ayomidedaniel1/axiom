@@ -1,41 +1,22 @@
 import { useChat } from "@ai-sdk/react";
 import { ResearchStep } from "@/components/research/thought-log";
 
-interface ToolPart {
-  type: "tool-invocation";
-  toolInvocation: {
-    toolCallId: string;
-    toolName: string;
-    args?: unknown;
-    state?: string;
-  };
-}
-
-function isToolPart(part: unknown): part is ToolPart {
-  return (
-    typeof part === "object" &&
-    part !== null &&
-    "type" in part &&
-    (part as { type: string; }).type === "tool-invocation" &&
-    "toolInvocation" in part
-  );
-}
-
 export function useResearch() {
-  const { messages, sendMessage, setMessages } = useChat();
+  const { messages, sendMessage, setMessages, status } = useChat();
 
-  /**
-   * extracting and standardizing tool steps
-   */
+  const isLoading = status === "submitted" || status === "streaming";
+
   function getResearchSteps(): ResearchStep[] {
     if (!messages) return [];
 
     return messages.flatMap((message) => {
+      // Safety check for message parts
       if (!message.parts) return [];
 
       return message.parts
         .filter((part) => part.type === "tool-invocation")
         .map((part) => {
+          // Type Assertion to fix the "TextPart" conflict
           const tool = (part as unknown as {
             toolInvocation: {
               toolCallId: string;
@@ -46,6 +27,7 @@ export function useResearch() {
             };
           }).toolInvocation;
 
+          // Safe access to input arguments
           const inputData = tool.args ?? (tool as unknown as { input: unknown; }).input;
 
           return {
@@ -53,7 +35,7 @@ export function useResearch() {
             toolName: tool.toolName,
             input: inputData,
             isComplete: tool.state === 'result',
-            result: tool.result,
+            result: tool.state === 'result' ? tool.result : undefined,
           };
         });
     });
@@ -64,5 +46,6 @@ export function useResearch() {
     sendMessage,
     setMessages,
     steps: getResearchSteps(),
+    isLoading,
   };
 }
