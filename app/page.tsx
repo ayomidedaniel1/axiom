@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command } from "lucide-react";
+import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command, AlertCircle } from "lucide-react";
 import { ThoughtLog } from "@/components/research/thought-log";
 import { Header } from "@/components/layout/header";
 import { PromptSuggestions } from "@/components/research/prompt-suggestions";
@@ -12,7 +12,7 @@ import { useResearch } from "@/hooks/use-research";
 import { UIMessage } from "ai";
 
 export default function Page() {
-  const { messages, sendMessage, steps, isLoading } = useResearch();
+  const { messages, sendMessage, steps, isLoading, errorInfo } = useResearch();
   const [input, setInput] = useState("");
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,6 +82,19 @@ export default function Page() {
                   getTextFromMessage={getTextFromMessage}
                 />
               ))}
+
+              {/* Error Display */}
+              {errorInfo && (
+                <div className="flex gap-3 justify-start animate-fade-in">
+                  <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0 border border-red-500/30">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%]">
+                    <p className="text-red-400 font-medium text-sm">{errorInfo.title}</p>
+                    <p className="text-red-300/70 text-xs mt-1">{errorInfo.message}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Loading Indicator */}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
