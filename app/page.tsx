@@ -1,31 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command } from "lucide-react";
 import { ThoughtLog } from "@/components/research/thought-log";
+import { Header } from "@/components/layout/header";
+import { PromptSuggestions } from "@/components/research/prompt-suggestions";
+import { MessageBubble } from "@/components/research/message-bubble";
 import { useResearch } from "@/hooks/use-research";
-import ReactMarkdown from "react-markdown";
 import { UIMessage } from "ai";
 
 export default function Page() {
-  const { messages, sendMessage, steps } = useResearch();
+  const { messages, sendMessage, steps, isLoading } = useResearch();
   const [input, setInput] = useState("");
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, steps, isLoading]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
-    const messageText = input;
-
+    const text = input;
     setInput("");
-
-    await sendMessage({
-      text: messageText,
-    });
+    await sendMessage({ text });
   };
 
-  // Helper: Extract text content safely from UIMessage parts
+  const handlePromptSelect = (prompt: string) => {
+    setInput(prompt);
+  };
+
   const getTextFromMessage = (message: UIMessage) => {
     if (!message.parts) return "";
     return message.parts
@@ -34,73 +40,140 @@ export default function Page() {
       .join("");
   };
 
-  const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
-  const reportContent = lastAssistantMessage ? getTextFromMessage(lastAssistantMessage) : "";
-
   return (
-    <div className="grid grid-cols-12 h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-background text-foreground">
+      {/* Header */}
+      <Header
+        onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+        sidebarVisible={sidebarVisible}
+      />
 
-      {/* LEFT: Chat Area */}
-      <div className="col-span-8 flex flex-col h-full relative">
-        <div className="flex-1 p-8 overflow-y-auto scrollbar-hide">
-          <div className="max-w-3xl mx-auto space-y-8">
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* LEFT: Chat Interface */}
+        <div className={`flex flex-col h-full relative transition-all duration-300 ${sidebarVisible ? 'flex-1' : 'w-full'}`}>
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+            <div className="max-w-3xl mx-auto space-y-6">
 
-            {/* User Message */}
-            {messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-              <div className="flex justify-end">
-                <div className="bg-secondary text-secondary-foreground px-4 py-2 rounded-2xl rounded-tr-sm max-w-[80%]">
-                  {getTextFromMessage(messages[messages.length - 1])}
+              {/* Empty State */}
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-fade-in">
+                  <div className="relative">
+                    <div className="absolute inset-0 blur-3xl bg-purple-500/20 rounded-full" />
+                    <div className="relative w-20 h-20 rounded-2xl gradient-purple flex items-center justify-center shadow-2xl shadow-purple-500/30">
+                      <Sparkles className="w-10 h-10 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h1 className="text-2xl font-semibold gradient-text">Axiom Research Agent</h1>
+                    <p className="text-muted-foreground">
+                      Search the web, analyze sources, and get research reports.
+                    </p>
+                  </div>
+                  <PromptSuggestions onSelectPrompt={handlePromptSelect} />
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Assistant Report */}
-            {lastAssistantMessage && reportContent ? (
-              <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-secondary/50 max-w-none animate-in fade-in duration-500">
-                <ReactMarkdown>{reportContent}</ReactMarkdown>
+              {/* Messages */}
+              {messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  getTextFromMessage={getTextFromMessage}
+                />
+              ))}
+
+              {/* Loading Indicator */}
+              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                <div className="flex gap-3 justify-start animate-fade-in">
+                  <div className="w-8 h-8 rounded-full gradient-emerald flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
+                    <Bot className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="bg-secondary/50 border border-white/5 px-5 py-4 rounded-2xl rounded-tl-sm flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                    </div>
+                    <span className="text-xs text-muted-foreground ml-2">Researching...</span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="p-4 md:p-6 glass border-t border-white/5">
+            <div className="max-w-3xl mx-auto">
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleSend(); }}
+                className="relative flex gap-2"
+              >
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Ask a research question..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="w-full bg-secondary/50 border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 h-12 pl-4 pr-12 rounded-xl text-sm"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-muted-foreground/40">
+                    <Command className="w-3 h-3" />
+                    <span className="text-[10px]">Enter</span>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!input.trim() || isLoading}
+                  className="h-12 w-12 rounded-xl gradient-purple hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-purple-500/20"
+                >
+                  <Send className="w-5 h-5 text-white" />
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Live Thought Logs */}
+        <div
+          className={`
+            h-full glass flex flex-col border-l border-white/5 transition-all duration-300 overflow-hidden
+            ${sidebarVisible ? 'w-80 lg:w-96 opacity-100' : 'w-0 opacity-0'}
+          `}
+        >
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-white/5 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md gradient-purple flex items-center justify-center">
+                <Sparkles className="w-3 h-3 text-white" />
+              </div>
+              <span className="font-medium text-xs tracking-wide text-foreground/80">Live Reasoning</span>
+            </div>
+            {steps.length > 0 && (
+              <span className="text-[10px] bg-white/5 px-2 py-1 rounded-full text-muted-foreground font-mono">
+                {steps.length} {steps.length === 1 ? 'Step' : 'Steps'}
+              </span>
+            )}
+          </div>
+
+          {/* Sidebar Content */}
+          <div className="flex-1 overflow-hidden p-4">
+            {steps.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 gap-3">
+                <div className="w-16 h-16 border-2 border-dashed border-current rounded-2xl opacity-30 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-medium">Waiting for research</p>
+                  <p className="text-[10px] mt-0.5">Agent steps will appear here</p>
+                </div>
               </div>
             ) : (
-              // Empty State
-              messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full pt-20 opacity-50">
-                  <Sparkles className="w-12 h-12 mb-4 text-muted-foreground" />
-                  <p className="text-xl font-medium">Ready to research.</p>
-                </div>
-              )
+              <ThoughtLog steps={steps} />
             )}
           </div>
-        </div>
-
-        {/* Input Area */}
-        <div className="p-6">
-          <div className="max-w-3xl mx-auto relative group">
-            <div className="absolute -inset-0.5 bg-linear-to-r from-pink-500 to-purple-600 rounded-xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
-            <form
-              onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-              className="relative flex gap-2 bg-secondary/80 backdrop-blur-xl p-2 rounded-xl border border-white/5"
-            >
-              <Input
-                placeholder="Ask Axiom to research anything..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="flex-1 bg-transparent border-none focus-visible:ring-0 text-base h-12"
-              />
-              <Button type="submit" size="icon" className="h-12 w-12 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-                <Send className="w-5 h-5" />
-              </Button>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT: Agent Sidebar */}
-      <div className="col-span-4 h-full border-l border-white/5 bg-secondary/10 backdrop-blur-sm flex flex-col">
-        <div className="p-6 border-b border-white/5 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-purple-400" />
-          <h2 className="font-medium text-sm tracking-wide text-muted-foreground uppercase">Research Loops</h2>
-        </div>
-        <div className="p-6 flex-1 overflow-hidden">
-          <ThoughtLog steps={steps} />
         </div>
       </div>
     </div>
