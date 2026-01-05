@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[]; } = await req.json();
 
   const result = streamText({
-    model: google("gemini-3-flash"),
+    model: google("gemini-2.0-flash-exp"),
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
     system: `You are Axiom, an autonomous research agent.
