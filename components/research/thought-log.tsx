@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, CheckCircle2, Search, BookOpen } from "lucide-react";
+import { Loader2, CheckCircle2, Search, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ResearchStep {
@@ -14,49 +17,137 @@ interface ThoughtLogProps {
   steps: ResearchStep[];
 }
 
-export function ThoughtLog({ steps }: ThoughtLogProps) {
-  return (
-    <ScrollArea className="h-full pr-4">
-      <div className="flex flex-col gap-3">
-        {steps.map((step) => (
-          <div
-            key={step.id}
-            className={cn(
-              "group flex flex-col gap-2 p-3 rounded-lg border border-transparent transition-all",
-              "hover:bg-white/5 hover:border-white/10",
-              !step.isComplete && "bg-white/5 border-white/5"
-            )}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "flex items-center justify-center w-6 h-6 rounded-full bg-secondary/50",
-                  step.toolName === 'webSearch' ? "text-blue-400" : "text-emerald-400"
-                )}>
-                  {step.toolName === 'webSearch' ? <Search size={12} /> : <BookOpen size={12} />}
-                </div>
-                <span className="font-medium text-sm text-foreground/90 capitalize tracking-tight">
-                  {step.toolName}
-                </span>
-              </div>
-              <div>
-                {step.isComplete ? (
-                  <CheckCircle2 className="w-4 h-4 text-muted-foreground/50" />
-                ) : (
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                )}
-              </div>
-            </div>
+function StepCard({ step, index, isLast }: { step: ResearchStep; index: number; isLast: boolean; }) {
+  const [expanded, setExpanded] = useState(false);
 
-            {/* Input Data */}
-            <div className="pl-9">
-              <div className="font-mono text-[10px] text-muted-foreground/70 truncate group-hover:whitespace-normal group-hover:overflow-visible transition-all">
-                <span className="text-primary/40 mr-2">$</span>
-                {JSON.stringify(step.input)}
-              </div>
+  const getToolIcon = () => {
+    switch (step.toolName) {
+      case 'webSearch':
+        return <Search className="w-3.5 h-3.5" />;
+      case 'readPage':
+        return <BookOpen className="w-3.5 h-3.5" />;
+      default:
+        return <Search className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const getToolColor = () => {
+    switch (step.toolName) {
+      case 'webSearch':
+        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+      case 'readPage':
+        return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      default:
+        return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+    }
+  };
+
+  const formatInput = (input: unknown): string => {
+    if (typeof input === 'string') return input;
+    if (typeof input === 'object' && input !== null) {
+      // Try to extract meaningful info
+      const obj = input as Record<string, unknown>;
+      if (obj.query) return String(obj.query);
+      if (obj.url) return String(obj.url);
+      return JSON.stringify(input, null, 2);
+    }
+    return String(input);
+  };
+
+  const displayInput = formatInput(step.input);
+  const isLongInput = displayInput.length > 60;
+
+  return (
+    <div
+      className={cn(
+        "relative animate-fade-in",
+        !isLast && "timeline-connector"
+      )}
+      style={{ "--stagger-index": index } as React.CSSProperties}
+    >
+      {/* Timeline Node */}
+      <div className="flex items-start gap-3">
+        {/* Node Circle */}
+        <div className={cn(
+          "relative z-10 flex items-center justify-center w-6 h-6 rounded-full border",
+          getToolColor(),
+          !step.isComplete && "animate-pulse"
+        )}>
+          {getToolIcon()}
+        </div>
+
+        {/* Content Card */}
+        <div
+          className={cn(
+            "flex-1 group rounded-xl border transition-all duration-200 cursor-pointer",
+            "hover:bg-white/5",
+            step.isComplete
+              ? "bg-transparent border-white/5"
+              : "bg-white/5 border-white/10 shadow-lg shadow-primary/5"
+          )}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-3">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm text-foreground/90 capitalize">
+                {step.toolName === 'webSearch' ? 'Web Search' :
+                  step.toolName === 'readPage' ? 'Read Page' :
+                    step.toolName}
+              </span>
+              {!step.isComplete && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                  Running
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {step.isComplete ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400/70" />
+              ) : (
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              )}
+              {isLongInput && (
+                expanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                )
+              )}
             </div>
           </div>
+
+          {/* Input Preview / Expanded Content */}
+          <div className="px-3 pb-3">
+            <div className={cn(
+              "font-mono text-[11px] text-muted-foreground/70 rounded-lg p-2 bg-black/20",
+              !expanded && "truncate"
+            )}>
+              <span className="text-primary/50 mr-1.5">$</span>
+              {expanded ? (
+                <pre className="whitespace-pre-wrap break-words">{displayInput}</pre>
+              ) : (
+                <span className="truncate">{displayInput.slice(0, 60)}{isLongInput && '...'}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ThoughtLog({ steps }: ThoughtLogProps) {
+  return (
+    <ScrollArea className="h-full pr-2">
+      <div className="flex flex-col gap-4 pb-4">
+        {steps.map((step, index) => (
+          <StepCard
+            key={step.id}
+            step={step}
+            index={index}
+            isLast={index === steps.length - 1}
+          />
         ))}
       </div>
     </ScrollArea>
