@@ -1,73 +1,68 @@
-"use client";
-
 import { useChat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
-import { DefaultChatTransport } from "ai";
+import { ResearchStep } from "@/components/research/thought-log";
 
-/**
- * Tool invocation part type for extracting tool calls from messages.
- */
-interface ToolInvocationPart {
+interface ToolPart {
   type: "tool-invocation";
   toolInvocation: {
     toolCallId: string;
     toolName: string;
-    args: unknown;
-    state: "partial-call" | "call" | "result";
-    result?: unknown;
+    args?: unknown;
+    state?: string;
   };
 }
 
-/**
- * Custom hook for managing research chat interactions.
- * Uses the AI SDK's useChat hook to communicate with the research API.
- */
+function isToolPart(part: unknown): part is ToolPart {
+  return (
+    typeof part === "object" &&
+    part !== null &&
+    "type" in part &&
+    (part as { type: string; }).type === "tool-invocation" &&
+    "toolInvocation" in part
+  );
+}
+
 export function useResearch() {
-  const chat = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-    }),
-  });
+  const { messages, sendMessage, setMessages } = useChat();
 
   /**
-   * Sends a research query to the AI.
-   * @param query - The research query string
+   * extracting and standardizing tool steps
    */
-  const sendQuery = async (query: string) => {
-    // In SDK 6.0/UI 3.0, sendMessage is the preferred method
-    // It automatically handles appending and submission
-    chat.sendMessage({
-      role: "user",
-      content: query,
+  function getResearchSteps(): ResearchStep[] {
+    if (!messages) return [];
+
+    return messages.flatMap((message) => {
+      if (!message.parts) return [];
+
+      return message.parts
+        .filter((part) => part.type === "tool-invocation")
+        .map((part) => {
+          const tool = (part as unknown as {
+            toolInvocation: {
+              toolCallId: string;
+              toolName: string;
+              args: unknown;
+              state: string;
+              result?: unknown;
+            };
+          }).toolInvocation;
+
+          const inputData = tool.args ?? (tool as unknown as { input: unknown; }).input;
+
+          return {
+            id: tool.toolCallId,
+            toolName: tool.toolName,
+            input: inputData,
+            isComplete: tool.state === 'result',
+            result: tool.result,
+          };
+        });
     });
-  };
-
-  /**
-   * Extracts tool invocations from all messages.
-   * Useful for displaying research steps in the UI.
-   */
-  const getToolInvocations = () => {
-    return chat.messages.flatMap((message: UIMessage) => {
-      // Prioritize checking parts for modern tool invocations
-      if (message.parts) {
-        return message.parts
-          .filter((part): part is ToolInvocationPart => part.type === "tool-invocation")
-          .map((part) => part.toolInvocation);
-      }
-
-      return [];
-    });
-  };
-
-  /**
-   * Checks if the research is currently in progress.
-   */
-  const isLoading = chat.status === "streaming" || chat.status === "submitted";
+  }
 
   return {
-    ...chat,
-    isLoading,
-    sendQuery,
-    getToolInvocations,
+    messages,
+    sendMessage,
+    setMessages,
+    steps: getResearchSteps(),
   };
 }
