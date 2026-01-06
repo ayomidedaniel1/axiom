@@ -12,6 +12,14 @@ export async function POST(req: Request) {
       model: google("gemini-3-flash-preview"),
       messages: await convertToModelMessages(messages),
       stopWhen: stepCountIs(5),
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingLevel: "medium",
+            includeThoughts: true,
+          },
+        },
+      },
       system: `You are Axiom, an autonomous research agent.
       Your goal is to provide deep, verified insights.
       
