@@ -1,5 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import { ResearchStep } from "@/components/research/thought-log";
+import { ResearchStep, ReasoningStep, ThoughtStep } from "@/components/research/thought-log";
 
 export function useResearch() {
   const { messages, sendMessage, setMessages, status, error } = useChat();
@@ -45,16 +45,33 @@ export function useResearch() {
     };
   };
 
-  function getResearchSteps(): ResearchStep[] {
+  function getThoughtSteps(): ThoughtStep[] {
     if (!messages) return [];
 
-    return messages.flatMap((message) => {
-      // Safety check for message parts
-      if (!message.parts) return [];
+    const steps: ThoughtStep[] = [];
+    let reasoningCounter = 0;
 
-      return message.parts
-        .filter((part) => part.type === "tool-invocation")
-        .map((part) => {
+    messages.forEach((message) => {
+      // Safety check for message parts
+      if (!message.parts) return;
+
+      message.parts.forEach((part) => {
+        // Extract reasoning parts
+        if (part.type === "reasoning") {
+          const reasoningPart = part as unknown as {
+            reasoning: string;
+          };
+          reasoningCounter++;
+          steps.push({
+            id: `reasoning-${message.id}-${reasoningCounter}`,
+            type: 'reasoning',
+            content: reasoningPart.reasoning || (part as unknown as { text?: string; }).text || '',
+            isComplete: true, // Reasoning is streamed, so we mark complete when visible
+          } as ReasoningStep);
+        }
+
+        // Extract tool invocations
+        if (part.type === "tool-invocation") {
           // Type Assertion to fix the "TextPart" conflict
           const tool = (part as unknown as {
             toolInvocation: {
@@ -69,22 +86,26 @@ export function useResearch() {
           // Safe access to input arguments
           const inputData = tool.args ?? (tool as unknown as { input: unknown; }).input;
 
-          return {
+          steps.push({
             id: tool.toolCallId,
+            type: 'tool',
             toolName: tool.toolName,
             input: inputData,
             isComplete: tool.state === 'result',
             result: tool.state === 'result' ? tool.result : undefined,
-          };
-        });
+          } as ResearchStep);
+        }
+      });
     });
+
+    return steps;
   }
 
   return {
     messages,
     sendMessage,
     setMessages,
-    steps: getResearchSteps(),
+    steps: getThoughtSteps(),
     isLoading,
     error,
     errorInfo: getErrorInfo(),
