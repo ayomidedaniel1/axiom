@@ -1,36 +1,40 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command, AlertCircle } from "lucide-react";
+import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command, AlertCircle, History } from "lucide-react";
 import { ThoughtLog } from "@/components/research/thought-log";
 import { Header } from "@/components/layout/header";
 import { PromptSuggestions } from "@/components/research/prompt-suggestions";
 import { MessageBubble } from "@/components/research/message-bubble";
+import { ChatHistory } from "@/components/research/chat-history";
 import { useResearch } from "@/hooks/use-research";
+import { useChatHistory, Message } from "@/hooks/use-chat-history";
+import { useAuth } from "@/components/auth/auth-provider";
 import { UIMessage } from "ai";
 
 export default function Page() {
-  const { messages, sendMessage, steps, isLoading, errorInfo } = useResearch();
+  const { user, loading: authLoading } = useAuth();
+  const { messages, sendMessage, setMessages, steps, isLoading, errorInfo } = useResearch();
+  const {
+    conversations,
+    currentConversationId,
+    loading: historyLoading,
+    loadConversations,
+    loadMessages,
+    createConversation,
+    updateConversationTitle,
+    saveMessage,
+    deleteConversation,
+    selectConversation,
+  } = useChatHistory();
+
   const [input, setInput] = useState("");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [historyVisible, setHistoryVisible] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, steps, isLoading]);
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const text = input;
-    setInput("");
-    await sendMessage({ text });
-  };
-
-  const handlePromptSelect = (prompt: string) => {
-    setInput(prompt);
-  };
+  const lastSavedMessageRef = useRef<string | null>(null);
 
   const getTextFromMessage = (message: UIMessage) => {
     if (!message.parts) return "";
@@ -39,6 +43,114 @@ export default function Page() {
       .map((part) => part.text)
       .join("");
   };
+
+  // Load conversations on mount
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    }
+  }, [user, loadConversations]);
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (currentConversationId) {
+      loadMessages(currentConversationId).then((dbMessages) => {
+        // Convert DB messages to UIMessage format
+        const uiMessages: UIMessage[] = dbMessages.map((m: Message) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parts: [{ type: "text" as const, text: m.content }],
+          createdAt: new Date(m.created_at),
+        }));
+        setMessages(uiMessages);
+      });
+    } else {
+      setMessages([]);
+    }
+  }, [currentConversationId, loadMessages, setMessages]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, steps, isLoading]);
+
+  // Save assistant messages when they complete
+  useEffect(() => {
+    if (!currentConversationId || isLoading) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (
+      lastMessage &&
+      lastMessage.role === "assistant" &&
+      lastMessage.id !== lastSavedMessageRef.current
+    ) {
+      const content = getTextFromMessage(lastMessage);
+      if (content) {
+        saveMessage(currentConversationId, "assistant", content);
+        lastSavedMessageRef.current = lastMessage.id;
+
+        // Update conversation title based on first user message if it's still "New Chat"
+        const conv = conversations.find((c) => c.id === currentConversationId);
+        if (conv && conv.title === "New Chat" && messages.length >= 2) {
+          const firstUserMessage = messages.find((m) => m.role === "user");
+          if (firstUserMessage) {
+            const title = getTextFromMessage(firstUserMessage).slice(0, 50);
+            updateConversationTitle(currentConversationId, title || "New Chat");
+          }
+        }
+      }
+    }
+  }, [messages, isLoading, currentConversationId, saveMessage, conversations, updateConversationTitle]);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const text = input;
+    setInput("");
+
+    // Create new conversation if none selected
+    let convId = currentConversationId;
+    if (!convId) {
+      convId = await createConversation();
+      if (!convId) return;
+    }
+
+    // Save user message
+    await saveMessage(convId, "user", text);
+
+    // Send to AI
+    await sendMessage({ text });
+  };
+
+  const handlePromptSelect = (prompt: string) => {
+    setInput(prompt);
+  };
+
+  const handleNewChat = useCallback(async () => {
+    selectConversation(null);
+    setMessages([]);
+    lastSavedMessageRef.current = null;
+  }, [selectConversation, setMessages]);
+
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      selectConversation(id);
+      lastSavedMessageRef.current = null;
+    },
+    [selectConversation]
+  );
+
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <span className="w-5 h-5 border-2 border-white/30 border-t-primary rounded-full animate-spin" />
+          Loading...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-background text-foreground">
@@ -50,8 +162,51 @@ export default function Page() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* LEFT: Chat Interface */}
-        <div className={`flex flex-col h-full relative transition-all duration-300 ${sidebarVisible ? 'flex-1' : 'w-full'}`}>
+        {/* LEFT: Chat History Sidebar */}
+        <div
+          className={`
+            h-full glass flex flex-col border-r border-white/5 transition-all duration-300 overflow-hidden
+            ${historyVisible ? 'w-64' : 'w-0'}
+          `}
+        >
+          <ChatHistory
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onSelectConversation={handleSelectConversation}
+            onNewChat={handleNewChat}
+            onDeleteConversation={deleteConversation}
+            loading={historyLoading}
+          />
+        </div>
+
+        {/* Toggle History Button (when hidden) */}
+        {!historyVisible && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHistoryVisible(true)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-lg bg-secondary/80 hover:bg-white/10"
+          >
+            <History className="w-4 h-4 text-muted-foreground" />
+          </Button>
+        )}
+
+        {/* CENTER: Chat Interface */}
+        <div className={`flex flex-col h-full relative transition-all duration-300 flex-1`}>
+          {/* History Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHistoryVisible(!historyVisible)}
+            className="absolute left-4 top-4 z-10 h-8 w-8 rounded-lg hover:bg-white/5"
+          >
+            {historyVisible ? (
+              <PanelRightClose className="w-4 h-4 text-muted-foreground rotate-180" />
+            ) : (
+              <PanelRight className="w-4 h-4 text-muted-foreground rotate-180" />
+            )}
+          </Button>
+
           <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
             <div className="max-w-3xl mx-auto space-y-6">
 
