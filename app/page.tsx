@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/header";
 import { PromptSuggestions } from "@/components/research/prompt-suggestions";
 import { MessageBubble } from "@/components/research/message-bubble";
 import { ChatHistory } from "@/components/research/chat-history";
+import { SourcesPanel } from "@/components/research/sources-panel";
 import { useResearch } from "@/hooks/use-research";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useUIStore } from "@/stores/ui-store";
@@ -333,7 +334,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* RIGHT: Live Thought Logs */}
+        {/* RIGHT: Live Thought Logs & Sources */}
         <div
           className={`
             h-full glass flex flex-col border-l border-white/5 transition-all duration-300 overflow-hidden
@@ -355,8 +356,8 @@ export default function Page() {
             )}
           </div>
 
-          {/* Sidebar Content */}
-          <div className="flex-1 overflow-hidden p-4">
+          {/* Thought Log Content */}
+          <div className="flex-1 overflow-hidden p-4 min-h-0">
             {steps.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 gap-3">
                 <div className="w-16 h-16 border-2 border-dashed border-current rounded-2xl opacity-30 flex items-center justify-center">
@@ -370,6 +371,11 @@ export default function Page() {
             ) : (
               <ThoughtLog steps={steps} />
             )}
+          </div>
+
+          {/* Sources Panel - below ThoughtLog */}
+          <div className="border-t border-white/5 max-h-[40%] overflow-hidden">
+            <SourcesPanel />
           </div>
         </div>
       </div>
