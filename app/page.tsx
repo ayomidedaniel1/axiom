@@ -48,6 +48,10 @@ export default function Page() {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSavedMessageRef = useRef<string | null>(null);
+  // Track if we're restoring from DB (to prevent save loops)
+  const isRestoringFromDbRef = useRef(false);
+  // Track which message IDs came from the database
+  const dbMessageIdsRef = useRef<Set<string>>(new Set());
 
   const getTextFromMessage = (message: UIMessage) => {
     if (!message.parts) return "";
@@ -61,8 +65,14 @@ export default function Page() {
   const prevConversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only sync when we have DB messages
-    if (dbMessages.length > 0) {
+    // Only sync when we have DB messages AND conversation changed
+    if (dbMessages.length > 0 && currentConversationId !== prevConversationIdRef.current) {
+      // Mark that we're restoring from DB
+      isRestoringFromDbRef.current = true;
+
+      // Store DB message IDs so we know not to re-save them
+      dbMessageIdsRef.current = new Set(dbMessages.map(m => m.id));
+
       const uiMessages: UIMessage[] = dbMessages.map((m: Message) => ({
         id: m.id,
         role: m.role,
@@ -71,10 +81,16 @@ export default function Page() {
         createdAt: new Date(m.created_at),
       }));
       setMessages(uiMessages);
+
+      // Reset flag after a tick to allow normal operation
+      setTimeout(() => {
+        isRestoringFromDbRef.current = false;
+      }, 100);
     }
-    // Only clear messages when conversation actually changes to null
+    // Clear messages when switching to new conversation (null)
     else if (currentConversationId === null && prevConversationIdRef.current !== null) {
       setMessages([]);
+      dbMessageIdsRef.current = new Set();
     }
 
     prevConversationIdRef.current = currentConversationId;
@@ -87,7 +103,8 @@ export default function Page() {
 
   // Save assistant messages when they complete
   useEffect(() => {
-    if (!currentConversationId || isLoading) return;
+    // Skip if restoring from DB, no conversation, or still loading
+    if (isRestoringFromDbRef.current || !currentConversationId || isLoading) return;
 
     const lastMessage = messages[messages.length - 1];
     if (
@@ -95,6 +112,12 @@ export default function Page() {
       lastMessage.role === "assistant" &&
       lastMessage.id !== lastSavedMessageRef.current
     ) {
+      // Skip if this message ID came from the database
+      if (dbMessageIdsRef.current.has(lastMessage.id)) {
+        lastSavedMessageRef.current = lastMessage.id;
+        return;
+      }
+
       const content = getTextFromMessage(lastMessage);
       if (content) {
         saveMessage.mutate({

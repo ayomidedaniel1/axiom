@@ -64,7 +64,7 @@ export function ChatHistory({
               <div
                 key={conv.id}
                 className={`
-                  group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-all
+                  flex items-center gap-2 p-2.5 rounded-lg cursor-pointer transition-all w-full
                   ${currentConversationId === conv.id
                     ? "bg-primary/10 border border-primary/20"
                     : "hover:bg-white/5"
@@ -73,14 +73,14 @@ export function ChatHistory({
                 onClick={() => onSelectConversation(conv.id)}
               >
                 <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 w-0">
                   <p className="text-sm truncate">{conv.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatDate(conv.updated_at)}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{formatDate(conv.updated_at)}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 hover:text-red-400"
+                  className="h-6 w-6 shrink-0 text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteConversation(conv.id);
