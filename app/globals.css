@@ -139,31 +139,16 @@
   }
 }
 
-/* Gradient utilities */
+/* Solid color utilities (replacing gradients) */
 @layer utilities {
   .gradient-purple {
-    background: linear-gradient(
-      135deg,
-      hsl(263 70% 58%) 0%,
-      hsl(280 70% 50%) 100%
-    );
+    background-color: hsl(263 70% 58%);
   }
   .gradient-emerald {
-    background: linear-gradient(
-      135deg,
-      hsl(160 84% 39%) 0%,
-      hsl(172 66% 50%) 100%
-    );
+    background-color: hsl(160 84% 39%);
   }
   .gradient-text {
-    background: linear-gradient(
-      135deg,
-      hsl(263 70% 58%) 0%,
-      hsl(160 84% 50%) 100%
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(263 70% 58%);
   }
 }
 
@@ -250,4 +235,20 @@
     --tw-prose-code: hsl(var(--primary));
     --tw-prose-pre-bg: hsl(var(--secondary) / 0.5);
   }
+}
+
+/* Source highlight animation for citation linking */
+@keyframes sourceHighlight {
+  0% {
+    background-color: hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.highlight-source {
+  animation: sourceHighlight 2s ease-out forwards;
 }
