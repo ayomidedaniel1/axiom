@@ -3,7 +3,7 @@
 import { MessageSquare, Plus, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Conversation } from "@/hooks/use-chat-history";
+import { Conversation } from "@/hooks/use-conversations";
 
 interface ChatHistoryProps {
   conversations: Conversation[];
@@ -11,7 +11,7 @@ interface ChatHistoryProps {
   onSelectConversation: (id: string) => void;
   onNewChat: () => void;
   onDeleteConversation: (id: string) => void;
-  loading?: boolean;
+  isLoading?: boolean;
 }
 
 export function ChatHistory({
@@ -20,7 +20,7 @@ export function ChatHistory({
   onSelectConversation,
   onNewChat,
   onDeleteConversation,
-  loading,
+  isLoading,
 }: ChatHistoryProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -49,7 +49,7 @@ export function ChatHistory({
       {/* Conversations List */}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
               Loading...

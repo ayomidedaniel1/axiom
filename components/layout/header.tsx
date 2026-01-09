@@ -4,25 +4,20 @@ import { Sparkles, Moon, Sun, Menu, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useUIStore } from "@/stores/ui-store";
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
   sidebarVisible?: boolean;
 }
 
-export function Header({ onToggleSidebar, sidebarVisible = true }: HeaderProps) {
+export function Header({ onToggleSidebar, sidebarVisible }: HeaderProps) {
   const { user, signOut } = useAuth();
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("axiom-theme") as "dark" | "light" | null;
-      return savedTheme ?? "dark";
-    }
-    return "dark";
-  });
+  const { theme, toggleTheme } = useUIStore();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Sync the theme class with the document (external system sync - no setState)
+  // Sync the theme class with the document
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
   }, [theme]);
@@ -38,11 +33,8 @@ export function Header({ onToggleSidebar, sidebarVisible = true }: HeaderProps) 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    localStorage.setItem("axiom-theme", newTheme);
-    document.documentElement.classList.toggle("light", newTheme === "light");
+  const handleToggleTheme = () => {
+    toggleTheme();
   };
 
   const handleSignOut = async () => {
@@ -70,7 +62,7 @@ export function Header({ onToggleSidebar, sidebarVisible = true }: HeaderProps) 
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleTheme}
+            onClick={handleToggleTheme}
             className="h-8 w-8 rounded-lg hover:bg-white/5 transition-colors"
           >
             {theme === "dark" ? (

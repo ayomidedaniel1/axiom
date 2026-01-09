@@ -10,29 +10,41 @@ import { PromptSuggestions } from "@/components/research/prompt-suggestions";
 import { MessageBubble } from "@/components/research/message-bubble";
 import { ChatHistory } from "@/components/research/chat-history";
 import { useResearch } from "@/hooks/use-research";
-import { useChatHistory, Message } from "@/hooks/use-chat-history";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useUIStore } from "@/stores/ui-store";
+import {
+  useConversations,
+  useCreateConversation,
+  useDeleteConversation,
+  useUpdateConversationTitle,
+} from "@/hooks/use-conversations";
+import { useMessages, useSaveMessage, Message } from "@/hooks/use-messages";
 import { UIMessage } from "ai";
 
 export default function Page() {
   const { user, loading: authLoading } = useAuth();
   const { messages, sendMessage, setMessages, steps, isLoading, errorInfo } = useResearch();
+
+  // Zustand UI state
   const {
-    conversations,
     currentConversationId,
-    loading: historyLoading,
-    loadConversations,
-    loadMessages,
-    createConversation,
-    updateConversationTitle,
-    saveMessage,
-    deleteConversation,
-    selectConversation,
-  } = useChatHistory();
+    setCurrentConversation,
+    sidebarVisible,
+    historyVisible,
+    toggleSidebar,
+    toggleHistory,
+    setHistoryVisible,
+  } = useUIStore();
+
+  // React Query hooks
+  const { data: conversations = [], isLoading: conversationsLoading } = useConversations();
+  const { data: dbMessages = [] } = useMessages(currentConversationId);
+  const createConversation = useCreateConversation();
+  const deleteConversation = useDeleteConversation();
+  const updateTitle = useUpdateConversationTitle();
+  const saveMessage = useSaveMessage();
 
   const [input, setInput] = useState("");
-  const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [historyVisible, setHistoryVisible] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSavedMessageRef = useRef<string | null>(null);
 
@@ -44,31 +56,28 @@ export default function Page() {
       .join("");
   };
 
-  // Load conversations on mount
-  useEffect(() => {
-    if (user) {
-      loadConversations();
-    }
-  }, [user, loadConversations]);
+  // Sync DB messages to UI messages when conversation changes
+  const prevConversationIdRef = useRef<string | null>(null);
 
-  // Load messages when conversation changes
   useEffect(() => {
-    if (currentConversationId) {
-      loadMessages(currentConversationId).then((dbMessages) => {
-        // Convert DB messages to UIMessage format
-        const uiMessages: UIMessage[] = dbMessages.map((m: Message) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          parts: [{ type: "text" as const, text: m.content }],
-          createdAt: new Date(m.created_at),
-        }));
-        setMessages(uiMessages);
-      });
-    } else {
+    // Only sync when we have DB messages
+    if (dbMessages.length > 0) {
+      const uiMessages: UIMessage[] = dbMessages.map((m: Message) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        parts: [{ type: "text" as const, text: m.content }],
+        createdAt: new Date(m.created_at),
+      }));
+      setMessages(uiMessages);
+    }
+    // Only clear messages when conversation actually changes to null
+    else if (currentConversationId === null && prevConversationIdRef.current !== null) {
       setMessages([]);
     }
-  }, [currentConversationId, loadMessages, setMessages]);
+
+    prevConversationIdRef.current = currentConversationId;
+  }, [dbMessages, currentConversationId, setMessages]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -87,7 +96,11 @@ export default function Page() {
     ) {
       const content = getTextFromMessage(lastMessage);
       if (content) {
-        saveMessage(currentConversationId, "assistant", content);
+        saveMessage.mutate({
+          conversationId: currentConversationId,
+          role: "assistant",
+          content,
+        });
         lastSavedMessageRef.current = lastMessage.id;
 
         // Update conversation title based on first user message if it's still "New Chat"
@@ -96,12 +109,12 @@ export default function Page() {
           const firstUserMessage = messages.find((m) => m.role === "user");
           if (firstUserMessage) {
             const title = getTextFromMessage(firstUserMessage).slice(0, 50);
-            updateConversationTitle(currentConversationId, title || "New Chat");
+            updateTitle.mutate({ id: currentConversationId, title: title || "New Chat" });
           }
         }
       }
     }
-  }, [messages, isLoading, currentConversationId, saveMessage, conversations, updateConversationTitle]);
+  }, [messages, isLoading, currentConversationId, saveMessage, conversations, updateTitle]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -111,12 +124,17 @@ export default function Page() {
     // Create new conversation if none selected
     let convId = currentConversationId;
     if (!convId) {
-      convId = await createConversation();
-      if (!convId) return;
+      const newConv = await createConversation.mutateAsync(undefined);
+      convId = newConv.id;
+      setCurrentConversation(convId);
     }
 
     // Save user message
-    await saveMessage(convId, "user", text);
+    await saveMessage.mutateAsync({
+      conversationId: convId,
+      role: "user",
+      content: text,
+    });
 
     // Send to AI
     await sendMessage({ text });
@@ -126,18 +144,29 @@ export default function Page() {
     setInput(prompt);
   };
 
-  const handleNewChat = useCallback(async () => {
-    selectConversation(null);
+  const handleNewChat = useCallback(() => {
+    setCurrentConversation(null);
     setMessages([]);
     lastSavedMessageRef.current = null;
-  }, [selectConversation, setMessages]);
+  }, [setCurrentConversation, setMessages]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
-      selectConversation(id);
+      setCurrentConversation(id);
       lastSavedMessageRef.current = null;
     },
-    [selectConversation]
+    [setCurrentConversation]
+  );
+
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      deleteConversation.mutate(id);
+      if (currentConversationId === id) {
+        setCurrentConversation(null);
+        setMessages([]);
+      }
+    },
+    [deleteConversation, currentConversationId, setCurrentConversation, setMessages]
   );
 
   // Show loading state while auth is loading
@@ -156,7 +185,7 @@ export default function Page() {
     <div className="flex flex-col h-screen w-full overflow-hidden bg-background text-foreground">
       {/* Header */}
       <Header
-        onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+        onToggleSidebar={toggleSidebar}
         sidebarVisible={sidebarVisible}
       />
 
@@ -174,8 +203,8 @@ export default function Page() {
             currentConversationId={currentConversationId}
             onSelectConversation={handleSelectConversation}
             onNewChat={handleNewChat}
-            onDeleteConversation={deleteConversation}
-            loading={historyLoading}
+            onDeleteConversation={handleDeleteConversation}
+            isLoading={conversationsLoading}
           />
         </div>
 
@@ -192,12 +221,12 @@ export default function Page() {
         )}
 
         {/* CENTER: Chat Interface */}
-        <div className={`flex flex-col h-full relative transition-all duration-300 flex-1`}>
+        <div className="flex flex-col h-full relative transition-all duration-300 flex-1">
           {/* History Toggle */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setHistoryVisible(!historyVisible)}
+            onClick={toggleHistory}
             className="absolute left-4 top-4 z-10 h-8 w-8 rounded-lg hover:bg-white/5"
           >
             {historyVisible ? (
