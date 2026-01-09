@@ -35,6 +35,10 @@ export default function Page() {
     toggleSidebar,
     toggleHistory,
     setHistoryVisible,
+    setSidebarVisible,
+    isMobile,
+    setIsMobile,
+    hasHydrated,
   } = useUIStore();
 
   // React Query hooks
@@ -100,6 +104,30 @@ export default function Page() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, steps, isLoading]);
+
+  // Mobile detection and initial sidebar state
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      return mobile;
+    };
+
+    // Initial check and close sidebars on mobile
+    const mobile = checkMobile();
+    if (mobile) {
+      setSidebarVisible(false);
+      setHistoryVisible(false);
+    }
+
+    // Listen for resize
+    const handleResize = () => {
+      checkMobile();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setIsMobile, setSidebarVisible, setHistoryVisible]);
 
   // Save assistant messages when they complete
   useEffect(() => {
@@ -218,8 +246,11 @@ export default function Page() {
         {/* LEFT: Chat History Sidebar */}
         <div
           className={`
-            h-full glass flex flex-col border-r border-white/5 transition-all duration-300 overflow-hidden
-            ${historyVisible ? 'w-64' : 'w-0'}
+            glass flex flex-col border-r border-white/5 transition-all duration-300 overflow-hidden
+            ${isMobile
+              ? `fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] ${historyVisible ? 'w-64 opacity-100' : 'w-0 opacity-0'}`
+              : `h-full ${historyVisible ? 'w-64' : 'w-0'}`
+            }
           `}
         >
           <ChatHistory
@@ -232,13 +263,24 @@ export default function Page() {
           />
         </div>
 
+        {/* Mobile backdrop overlay */}
+        {isMobile && (historyVisible || sidebarVisible) && (
+          <div
+            className="fixed inset-0 top-14 bg-black/50 z-30 backdrop-blur-sm"
+            onClick={() => {
+              if (historyVisible) setHistoryVisible(false);
+              if (sidebarVisible) setSidebarVisible(false);
+            }}
+          />
+        )}
+
         {/* Toggle History Button (when hidden) */}
         {!historyVisible && (
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setHistoryVisible(true)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-lg bg-secondary/80 hover:bg-white/10"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-50 h-8 w-8 rounded-lg bg-secondary/80 hover:bg-white/10"
           >
             <History className="w-4 h-4 text-muted-foreground" />
           </Button>
@@ -251,7 +293,7 @@ export default function Page() {
             variant="ghost"
             size="icon"
             onClick={toggleHistory}
-            className="absolute left-4 top-4 z-10 h-8 w-8 rounded-lg hover:bg-white/5"
+            className="absolute left-4 top-4 z-50 h-8 w-8 rounded-lg hover:bg-white/5"
           >
             {historyVisible ? (
               <PanelRightClose className="w-4 h-4 text-muted-foreground rotate-180" />
@@ -360,8 +402,11 @@ export default function Page() {
         {/* RIGHT: Live Thought Logs & Sources */}
         <div
           className={`
-            h-full glass flex flex-col border-l border-white/5 transition-all duration-300 overflow-hidden
-            ${sidebarVisible ? 'w-80 lg:w-96 opacity-100' : 'w-0 opacity-0'}
+            glass flex flex-col border-l border-white/5 transition-all duration-300 overflow-hidden
+            ${isMobile
+              ? `fixed top-14 right-0 z-40 h-[calc(100vh-3.5rem)] ${sidebarVisible ? 'w-80 opacity-100' : 'w-0 opacity-0'}`
+              : `h-full ${sidebarVisible ? 'w-80 lg:w-96 opacity-100' : 'w-0 opacity-0'}`
+            }
           `}
         >
           {/* Sidebar Header */}
