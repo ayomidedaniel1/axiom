@@ -109,7 +109,7 @@ export default function Page() {
         if (conv && conv.title === "New Chat" && messages.length >= 2) {
           const firstUserMessage = messages.find((m) => m.role === "user");
           if (firstUserMessage) {
-            const title = getTextFromMessage(firstUserMessage).slice(0, 50);
+            const title = getTextFromMessage(firstUserMessage).slice(0, 30);
             updateTitle.mutate({ id: currentConversationId, title: title || "New Chat" });
           }
         }

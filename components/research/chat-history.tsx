@@ -80,7 +80,7 @@ export function ChatHistory({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 hover:text-red-400"
+                  className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 hover:text-red-400"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteConversation(conv.id);

@@ -69,7 +69,7 @@ export async function POST(req: Request) {
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({ originalMessages: messages });
   } catch (error: unknown) {
     // Parse error details
     const errorObj = error as { statusCode?: number; message?: string; cause?: { statusCode?: number; }; };
