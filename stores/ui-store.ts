@@ -33,7 +33,7 @@ export type UIStore = UIState & UIActions;
 
 export const useUIStore = create<UIStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       currentConversationId: null,
       sidebarVisible: true,
       historyVisible: true,

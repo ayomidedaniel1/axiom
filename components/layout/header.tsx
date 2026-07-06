@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useUIStore } from "@/stores/ui-store";
+import Image from "next/image";
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -90,9 +91,12 @@ export function Header({ onToggleSidebar, sidebarVisible }: HeaderProps) {
                 className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/5 transition-colors"
               >
                 {user.user_metadata?.avatar_url ? (
-                  <img
+                  <Image
                     src={user.user_metadata.avatar_url}
                     alt="Avatar"
+                    width={32}
+                    height={32}
+                    unoptimized
                     className="w-8 h-8 rounded-full border border-white/10"
                   />
                 ) : (

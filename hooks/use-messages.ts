@@ -93,27 +93,4 @@ export function useSaveMessage() {
   });
 }
 
-// Delete all messages in a conversation (useful for clearing chat)
-export function useClearMessages() {
-  const supabase = createClient();
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (conversationId: string) => {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('conversation_id', conversationId);
-
-      if (error) throw error;
-      return conversationId;
-    },
-    onSuccess: (conversationId) => {
-      // Clear messages from cache
-      queryClient.setQueryData<Message[]>(
-        messageKeys.byConversation(conversationId),
-        []
-      );
-    },
-  });
-}

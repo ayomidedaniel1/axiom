@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Bot, User, Copy, Check, Download } from "lucide-react";
 import { UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
@@ -61,6 +61,33 @@ export function MessageBubble({ message, getTextFromMessage, createdAt, query }:
     return parts.length > 0 ? parts : text;
   }, [citationPattern]);
 
+  // Process nested children to find and replace citations recursively
+  function processChildrenWithCitations(children: React.ReactNode): React.ReactNode {
+    if (typeof children === 'string') {
+      return renderTextWithCitations(children);
+    }
+    if (Array.isArray(children)) {
+      return children.map((child, idx) => {
+        const processed = processChildrenWithCitations(child);
+        if (processed && typeof processed === 'object' && 'props' in processed) {
+          const element = processed as React.ReactElement;
+          return React.cloneElement(element, {
+            key: element.key ?? `citation-child-${idx}`
+          });
+        }
+        return processed;
+      });
+    }
+    if (children && typeof children === 'object' && 'props' in children) {
+      const element = children as React.ReactElement<{ children?: React.ReactNode; }>;
+      if (element.props && element.props.children) {
+        const processed = processChildrenWithCitations(element.props.children);
+        return React.cloneElement(element, undefined, processed);
+      }
+    }
+    return children;
+  }
+
   if (!content) return null;
 
   const isUser = message.role === "user";
@@ -77,17 +104,10 @@ export function MessageBubble({ message, getTextFromMessage, createdAt, query }:
   // Custom components for ReactMarkdown to handle citations
   const markdownComponents = {
     p: ({ children, ...props }: React.ComponentProps<'p'>) => {
-      // Process children to add citation links
-      const processedChildren = typeof children === 'string'
-        ? renderTextWithCitations(children)
-        : children;
-      return <p {...props}>{processedChildren}</p>;
+      return <p {...props}>{processChildrenWithCitations(children)}</p>;
     },
     li: ({ children, ...props }: React.ComponentProps<'li'>) => {
-      const processedChildren = typeof children === 'string'
-        ? renderTextWithCitations(children)
-        : children;
-      return <li {...props}>{processedChildren}</li>;
+      return <li {...props}>{processChildrenWithCitations(children)}</li>;
     },
   };
 

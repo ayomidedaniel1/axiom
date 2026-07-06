@@ -1,6 +1,9 @@
 -- Enable the pgvector extension to work with embeddings
 create extension if not exists vector;
 
+-- NOTE: The 'reports' and 'citations' tables are DEPRECATED and UNUSED in the current version of the app.
+-- Chat message state handles history, and citations are parsed and stored in the client-side Zustand store.
+/*
 -- Table to store research reports
 create table reports (
   id uuid primary key default gen_random_uuid(),
@@ -19,6 +22,7 @@ create table citations (
   content text not null,
   embedding vector(1536) -- Match the dimensions of Gemini/OpenAI embeddings
 );
+*/
 
 -- =====================================================
 -- USER AUTHENTICATION & CHAT HISTORY TABLES

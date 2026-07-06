@@ -23,7 +23,7 @@ import { useMessages, useSaveMessage, Message } from "@/hooks/use-messages";
 import { UIMessage } from "ai";
 
 export default function Page() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const { messages, sendMessage, setMessages, steps, isLoading, errorInfo } = useResearch();
 
   // Zustand UI state
@@ -38,7 +38,6 @@ export default function Page() {
     setSidebarVisible,
     isMobile,
     setIsMobile,
-    hasHydrated,
   } = useUIStore();
 
   // React Query hooks
