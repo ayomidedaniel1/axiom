@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, Sparkles, Bot, PanelRightClose, PanelRight, Command, AlertCircle, History } from "lucide-react";
 import { ThoughtLog } from "@/components/research/thought-log";
@@ -50,6 +49,7 @@ export default function Page() {
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSavedMessageRef = useRef<string | null>(null);
   // Track if we're restoring from DB (to prevent save loops)
   const isRestoringFromDbRef = useRef(false);
@@ -103,6 +103,16 @@ export default function Page() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, steps, isLoading]);
+
+  // Auto-grow input textarea height based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "48px"; // Reset height to default
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = `${Math.min(scrollHeight, 180)}px`;
+    }
+  }, [input]);
 
   // Mobile detection and initial sidebar state
   useEffect(() => {
@@ -191,6 +201,13 @@ export default function Page() {
     await sendMessage({ text });
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const handlePromptSelect = (prompt: string) => {
     setInput(prompt);
   };
@@ -258,6 +275,7 @@ export default function Page() {
             onSelectConversation={handleSelectConversation}
             onNewChat={handleNewChat}
             onDeleteConversation={handleDeleteConversation}
+            onUpdateConversationTitle={(id, title) => updateTitle.mutate({ id, title })}
             isLoading={conversationsLoading}
           />
         </div>
@@ -371,16 +389,19 @@ export default function Page() {
             <div className="max-w-3xl mx-auto">
               <form
                 onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                className="relative flex gap-2"
+                className="relative flex items-end gap-2"
               >
                 <div className="relative flex-1">
-                  <Input
+                  <textarea
+                    ref={textareaRef}
                     placeholder="Ask a research question..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="w-full bg-secondary/50 border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 h-12 pl-4 pr-12 rounded-xl text-sm"
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    className="w-full bg-secondary/50 border border-white/10 focus:outline-none focus:border-primary/50 py-3.5 pl-4 pr-12 rounded-xl text-sm resize-none scrollbar-thin overflow-y-auto block min-h-[48px] max-h-[180px] leading-tight text-foreground placeholder:text-muted-foreground/50 transition-all duration-150"
                   />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-muted-foreground/40">
+                  <div className="absolute right-3 bottom-3.5 hidden sm:flex items-center gap-1 text-muted-foreground/40">
                     <Command className="w-3 h-3" />
                     <span className="text-[10px]">Enter</span>
                   </div>
@@ -389,7 +410,7 @@ export default function Page() {
                   type="submit"
                   size="icon"
                   disabled={!input.trim() || isLoading}
-                  className="h-12 w-12 rounded-xl gradient-purple hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-purple-500/20"
+                  className="h-12 w-12 rounded-xl gradient-purple hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-purple-500/20 shrink-0"
                 >
                   <Send className="w-5 h-5 text-white" />
                 </Button>

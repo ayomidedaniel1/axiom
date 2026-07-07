@@ -23,6 +23,18 @@ export interface ReasoningStep {
 
 export type ThoughtStep = ResearchStep | ReasoningStep;
 
+interface SearchToolResult {
+  results: Array<{
+    sourceName: string;
+    url: string;
+    excerpt: string;
+  }>;
+}
+
+interface ScrapeToolResult {
+  content: string;
+}
+
 interface ThoughtLogProps {
   steps: ThoughtStep[];
 }
@@ -128,7 +140,7 @@ function StepCard({ step, index, isLast }: { step: ResearchStep; index: number; 
           </div>
 
           {/* Input Preview / Expanded Content */}
-          <div className="px-3 pb-3">
+          <div className="px-3 pb-3 space-y-2">
             <div className={cn(
               "font-mono text-[11px] text-muted-foreground/70 rounded-lg p-2 bg-black/20",
               !expanded && "truncate"
@@ -140,6 +152,82 @@ function StepCard({ step, index, isLast }: { step: ResearchStep; index: number; 
                 <span className="truncate">{displayInput.slice(0, 60)}{isLongInput && '...'}</span>
               )}
             </div>
+
+            {/* Tool Execution Result */}
+            {expanded && step.isComplete && !!step.result && (
+              <div className="mt-2 border-t border-white/5 pt-2 space-y-2">
+                <div className="text-[10px] text-muted-foreground font-semibold tracking-wider uppercase">
+                  Result
+                </div>
+                {step.toolName === 'webSearch' && (
+                  <div className="space-y-1.5">
+                    {(() => {
+                      const res = step.result as SearchToolResult;
+                      if (!res.results || res.results.length === 0) {
+                        return <p className="text-[11px] text-muted-foreground/50 font-sans">No pages found.</p>;
+                      }
+                      return res.results.map((item, idx) => {
+                        let hostname = "link";
+                        try {
+                          hostname = new URL(item.url).hostname.replace('www.', '');
+                        } catch {
+                          // fallback
+                        }
+                        return (
+                          <div key={idx} className="bg-white/[0.01] border border-white/5 rounded-lg p-2 text-[11px] hover:bg-white/[0.03] transition-colors font-sans">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-foreground/80 truncate max-w-[70%]">
+                                {item.sourceName}
+                              </span>
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] text-blue-400 hover:underline truncate shrink-0"
+                              >
+                                {hostname}
+                              </a>
+                            </div>
+                            {item.excerpt && (
+                              <p className="text-muted-foreground/60 mt-1 line-clamp-2 leading-normal">
+                                {item.excerpt}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+
+                {step.toolName === 'readPage' && (
+                  <div className="bg-white/[0.01] border border-white/5 rounded-lg p-2 text-[11px] font-sans">
+                    {(() => {
+                      const res = step.result as ScrapeToolResult;
+                      const content = res.content || "";
+                      if (!content) {
+                        return <p className="text-[11px] text-muted-foreground/50">Empty response or scrape failed.</p>;
+                      }
+                      const truncateLength = 800;
+                      const isTruncated = content.length > truncateLength;
+                      return (
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground/75 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin font-mono text-[10px]">
+                            {isTruncated ? `${content.slice(0, truncateLength)}...` : content}
+                          </p>
+                          {isTruncated && (
+                            <p className="text-[9px] text-muted-foreground/40 text-right">
+                              (Truncated: showing first {truncateLength} of {content.length} chars)
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
